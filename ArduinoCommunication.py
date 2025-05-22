@@ -13,18 +13,19 @@ def truncate_to_hundredths(n):
     return math.trunc(n * 100) / 100
 
 def readMessages():
-     global oldText
-     text =  response.text.strip()
-     if text != oldText:
-            print("Arduino responds:", text)
-            oldText = text
-            time.sleep(7)
-            speak_text("The Arduino says it got the number " + str(truncate_to_hundredths(float(text))))
-     oldText = text
+    global oldText
+    text =  response.text.strip()
+    if text != oldText:
+        print("Arduino responds:", text)
+        time.sleep(7)
+    if text =="Compute":
+        speak_text("Please repeat your question, I could not solve")
+    elif text != oldText:
+        speak_text("The Arduino says it got the number " + str(truncate_to_hundredths(float(text))))
+     
+    oldText = text
 
-     print("text")
-     
-     
+    print("text")
 
 
 
@@ -46,7 +47,8 @@ RequestTranscription = False
 while True:
     try:
         response = requests.get(ARDUINO_URL, timeout=3)
-
+        if response.text.strip() == "Could not Compute":
+            readMessages()
         try: 
             float(response.text.strip())
             readMessages()
@@ -56,9 +58,9 @@ while True:
         if response.status_code == 200 and transcriber.Completion == True and RequestTranscription == True:
             RequestTranscription = False
             math_problem = transcriber.transcribe_audio_array(audio)
-            ans = processor.process_and_check(math_problem)
+            ans = processor.process_question(math_problem)
 
-            finalMessage = "Solved the problem: " + math_problem + "     Answer Was:  " + ans
+            finalMessage = "Solved the problem: " + math_problem + "     Answer Was:  " + str(ans[0])
 
             sendMessage(re.findall(r'\S+',finalMessage))
             

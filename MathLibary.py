@@ -1,16 +1,19 @@
+# MathLibary.py (improved)
+from sympy import Function
+from math import pi
 import re
-from sympy import symbols, diff, sin, cos, tan, cot, sec, csc, exp, ln, log, sqrt, asin, acos, atan, sinh, cosh, tanh
+from sympy import symbols, diff, sin, cos, tan, cot, sec, csc, exp, ln, log, sqrt, asin, acos, atan, sinh, cosh, tanh, zoo
 from sympy.parsing.sympy_parser import parse_expr, standard_transformations, implicit_multiplication_application
 
 class MathProcessor:
     def __init__(self):
         self.x = symbols('x')
         self.local_dict = {
-            'sin': sin, 'cos': cos, 'tan': tan, 'cot': cot, 'sec': sec, 'csc': csc,
+            'sin': sin, 'sign': sin, 'cos': cos, 'tan': tan, 'cot': cot, 'sec': sec, 'csc': csc,
             'exp': exp, 'ln': ln, 'log': log, 'sqrt': sqrt,
-            'arcsin': asin, 'arccos': acos, 'arctan': atan,
-            'sinh': sinh, 'cosh': cosh, 'tanh': tanh,
-            'x': self.x, 'e': exp(1)
+            'arcsin': asin, 'arccos': acos, 'arctan': atan, 'cosine': cos, 'tangent': tan,
+            'sinh': sinh, 'cosh': cosh, 'tanh': tanh, 'inverse sign': sinh, 'inverse tan': tanh,  'inverse cosine': cosh,  'sine': sin, 'cose' : cos, 'square root': sqrt,
+            'x': self.x, 'e': exp(1), 'pi': pi,
         }
         self.transformations = standard_transformations + (implicit_multiplication_application,)
         self.number_words = {
@@ -20,7 +23,7 @@ class MathProcessor:
             'fourteen': '14', 'fifteen': '15', 'sixteen': '16', 'seventeen': '17',
             'eighteen': '18', 'nineteen': '19', 'twenty': '20',
             'thirty': '30', 'forty': '40', 'fifty': '50', 'sixty': '60',
-            'seventy': '70', 'eighty': '80', 'ninety': '90'
+            'seventy': '70', 'eighty': '80', 'ninety': '90', 'pie': str(pi), 'pi': str(pi),
         }
         self.magnitude_words = {
             'hundred': 100,
@@ -53,19 +56,11 @@ class MathProcessor:
         return text
 
     def replace_power_words(self, text):
-        # squared and cubed for digits or variables (letters/digits/underscore)
         text = re.sub(r'\b([a-zA-Z0-9_]+)\s+squared\b', r'(\1)**2', text)
         text = re.sub(r'\b([a-zA-Z0-9_]+)\s+cubed\b', r'(\1)**3', text)
-        
-        # raised to the nth power (for base digits or variables)
         text = re.sub(r'\b([a-zA-Z0-9_]+)\s+raised to the (\d+)(?:st|nd|rd|th)? power\b', r'(\1)**\2', text)
-        
-        # to the nth power (general)
         text = re.sub(r'to the (\d+)(?:st|nd|rd|th)? power', r'**\1', text)
-        
-        # to the power of n
         text = re.sub(r'to the power of (\d+)', r'**\1', text)
-        
         return text
 
     def preprocess(self, text):
@@ -73,7 +68,6 @@ class MathProcessor:
         text = self.replace_number_words(text)
         text = self.replace_power_words(text)
 
-        # Correct common math language
         text = re.sub(r'\bcosin\b', 'cos', text)
         text = re.sub(r'\bsing\b', 'sin', text)
         text = re.sub(r'\bover\b', '/', text)
@@ -91,20 +85,31 @@ class MathProcessor:
     def get_derivative(self, expr_str, var_str='x'):
         try:
             expr = parse_expr(expr_str, local_dict=self.local_dict, transformations=self.transformations)
+            
+            # Detect unknown functions
+            for f in expr.atoms(Function):
+                if f.func.__name__ not in self.local_dict:
+                    return None
+            
             var = symbols(var_str)
             deriv = diff(expr, var)
             return deriv
-        except Exception as e:
-            return f"Failed to compute derivative: {e}"
+        except Exception:
+            return None
 
     def evaluate_expression(self, expr_str):
         try:
             expr_str = re.sub(r'(?<=[0-9)])\s+(?=[0-9(])', '*', expr_str)  # implicit multiplication
             expr_str = expr_str.replace('^', '**')  # Allow ^ for power
             expr = parse_expr(expr_str, local_dict=self.local_dict, transformations=self.transformations)
-            return expr.evalf()
+            val = expr.evalf()
+
+            # Handle sympy zoo (complex infinity) as float('inf')
+            if val == zoo:
+                return float('inf')
+            return val
         except Exception as e:
-            return f"Failed to evaluate expression: {e}"
+            return None
 
     def process_question(self, question):
         question = self.preprocess(question)
@@ -115,7 +120,7 @@ class MathProcessor:
             if m:
                 expr_str = m.group(1).strip()
                 deriv = self.get_derivative(expr_str)
-                if isinstance(deriv, str) and deriv.startswith("Failed"):
+                if deriv is None:
                     return None, None
                 return str(deriv), deriv
 
@@ -124,61 +129,109 @@ class MathProcessor:
         if m:
             expr_str = m.group(1).strip()
             val = self.evaluate_expression(expr_str)
-            if isinstance(val, str) and val.startswith("Failed"):
+            if val is None:
                 return None, None
             return str(val), val
 
         # Raw expression fallback
-        try:
-            val = self.evaluate_expression(question)
-            if not (isinstance(val, str) and val.startswith("Failed")):
-                return str(val), val
-        except:
-            pass
+        val = self.evaluate_expression(question)
+        if val is not None:
+            return str(val), val
 
         return None, None
 
+    
     def is_definitely_off(self, question, answer):
         if answer is None:
             return True
 
-        if re.search(r'[a-zA-Z]{2,}', answer) and not any(func in answer for func in [
-            'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'exp', 'ln', 'log', 'sqrt',
-            'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh']):
-            return True
+        try:
+            expected_val = self.evaluate_expression(self.preprocess(question))
+            answer_val = float(answer)
+            if expected_val is None:
+                return True
+            return abs(expected_val - answer_val) > 1e-4
+        except Exception:
+            pass  # fallback to symbolic check
 
+        # Derivative check
         processed = self.preprocess(question)
-
         if 'derivative' in processed or 'differentiate' in processed or 'find the derivative' in processed:
             m = re.search(r'(?:derivative of|differentiate|find the derivative of)\s+(.+)', processed)
             if m:
                 expr_str = m.group(1).strip()
                 correct_deriv = self.get_derivative(expr_str)
-                if isinstance(correct_deriv, str) and correct_deriv.startswith("Failed"):
+                if correct_deriv is None:
                     return False
                 try:
-                    ans_expr = parse_expr(answer, local_dict=self.local_dict, transformations=self.transformations)
+                    ans_expr = parse_expr(str(answer), local_dict=self.local_dict, transformations=self.transformations)
                     corr_expr = parse_expr(str(correct_deriv), local_dict=self.local_dict, transformations=self.transformations)
-                    return (ans_expr - corr_expr).simplify() != 0
-                except:
+                    # Use equals instead of subtract-and-simplify
+                    return not ans_expr.equals(corr_expr)
+                except Exception:
                     return True
             return False
 
+        # Fallback
+        return False
+
+        # Numerical evaluation
         try:
-            correct_val = self.evaluate_expression(processed)
-            if isinstance(correct_val, str) and correct_val.startswith("Failed"):
-                return False
-            try:
-                user_val = float(answer)
-                correct_num = float(correct_val)
-                return abs(user_val - correct_num) > 1e-6
-            except:
-                return False
+            correct_val = float(answer)
+            expected_val = float(self.evaluate_expression(processed))
+            return abs(correct_val - expected_val) > 1e-4
         except:
             return False
 
-    def process_and_check(self, question):
-        answer, _ = self.process_question(question)
-        if self.is_definitely_off(question, answer):
-            return "Could not Compute"
-        return answer if answer is not None else "Could not Compute"
+
+# test_MathLibary.py (improved tests)
+
+import unittest
+
+class TestMathProcessor(unittest.TestCase):
+    def setUp(self):
+        from MathLibary import MathProcessor
+        self.mp = MathProcessor()
+
+    def test_derivative_basic(self):
+        question = "What is the derivative of x squared plus three?"
+        answer = "2*x + 0"  # 0 from derivative of constant 3
+        result, deriv_expr = self.mp.process_question(question)
+        self.assertIsNotNone(result)
+        # Check simplified equality by parsing
+        from sympy import simplify, sympify
+        self.assertTrue(simplify(sympify(result) - sympify(answer)) == 0)
+
+    def test_derivative_invalid(self):
+        question = "Find the derivative of unknownFunc(x)"
+        result, deriv_expr = self.mp.process_question(question)
+        self.assertIsNone(result)
+        self.assertIsNone(deriv_expr)
+
+    def test_evaluation(self):
+        question = "What is 2 plus 2?"
+        result, val = self.mp.process_question(question)
+        self.assertEqual(float(result), 4.0)
+
+    def test_large_number_word_replacement(self):
+        text = "three hundred"
+        replaced = self.mp.replace_large_number_phrases(text)
+        self.assertEqual(replaced, "300")
+
+    def test_is_definitely_off_numeric(self):
+        q = "What is 2 plus 2?"
+        self.assertFalse(self.mp.is_definitely_off(q, "4"))
+
+    def test_is_definitely_off_wrong_numeric(self):
+        q = "What is 2 plus 2?"
+        self.assertTrue(self.mp.is_definitely_off(q, "5"))
+
+    def test_is_definitely_off_derivative(self):
+        q = "What is the derivative of x squared?"
+        correct_deriv = "2*x"
+        wrong_deriv = "3*x"
+        self.assertFalse(self.mp.is_definitely_off(q, correct_deriv))
+        self.assertTrue(self.mp.is_definitely_off(q, wrong_deriv))
+
+if __name__ == '__main__':
+    unittest.main()

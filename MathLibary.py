@@ -38,10 +38,11 @@ class MathProcessor:
                 num = int(self.number_words[num_word])
                 mag = self.magnitude_words[mag_word]
                 return str(num * mag)
-            return m.group(0)  # fallback: return original string if anything unexpected
+            return m.group(0)  # fallback
 
-        # Handle patterns like "two million", "five thousand"
-        text = re.sub(r'\b(' + '|'.join(self.number_words.keys()) + r')\s+(' + '|'.join(self.magnitude_words.keys()) + r')\b', convert_match, text)
+        text = re.sub(
+            r'\b(' + '|'.join(self.number_words.keys()) + r')\s+(' + '|'.join(self.magnitude_words.keys()) + r')\b',
+            convert_match, text)
         return text
 
     def replace_number_words(self, text):
@@ -52,10 +53,19 @@ class MathProcessor:
         return text
 
     def replace_power_words(self, text):
-        text = re.sub(r'\b(\d+|x)\s+squared\b', r'(\1)**2', text)
-        text = re.sub(r'\b(\d+|x)\s+cubed\b', r'(\1)**3', text)
+        # squared and cubed for digits or variables (letters/digits/underscore)
+        text = re.sub(r'\b([a-zA-Z0-9_]+)\s+squared\b', r'(\1)**2', text)
+        text = re.sub(r'\b([a-zA-Z0-9_]+)\s+cubed\b', r'(\1)**3', text)
+        
+        # raised to the nth power (for base digits or variables)
+        text = re.sub(r'\b([a-zA-Z0-9_]+)\s+raised to the (\d+)(?:st|nd|rd|th)? power\b', r'(\1)**\2', text)
+        
+        # to the nth power (general)
         text = re.sub(r'to the (\d+)(?:st|nd|rd|th)? power', r'**\1', text)
+        
+        # to the power of n
         text = re.sub(r'to the power of (\d+)', r'**\1', text)
+        
         return text
 
     def preprocess(self, text):
@@ -89,7 +99,7 @@ class MathProcessor:
 
     def evaluate_expression(self, expr_str):
         try:
-            expr_str = re.sub(r'(?<=[0-9)])\s+(?=[0-9(])', '*', expr_str)  # Handle implicit multiplication
+            expr_str = re.sub(r'(?<=[0-9)])\s+(?=[0-9(])', '*', expr_str)  # implicit multiplication
             expr_str = expr_str.replace('^', '**')  # Allow ^ for power
             expr = parse_expr(expr_str, local_dict=self.local_dict, transformations=self.transformations)
             return expr.evalf()

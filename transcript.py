@@ -39,3 +39,5 @@ class Transcriptor:
         print("Transcribing")
         result = self.model.transcribe(audio_array, fp16=False, language="en", task="transcribe")
         return result["text"]
+
+    

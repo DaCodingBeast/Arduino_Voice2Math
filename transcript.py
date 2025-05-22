@@ -1,47 +1,41 @@
-from openai import completions
 import whisper
-import os
 import sounddevice as sd
 import numpy as np
-from scipy.io.wavfile import write
 
 class Transcriptor:
-
     Completion = False
-    def __init__(self):
-        
-        self.model = whisper.load_model("small")
 
-    def record_audio(self, filename = "r.wav", samplerate=16000):
-        self.audiopath = filename
+    def __init__(self, model_size="small"):
+        print("Loading Whisper model...")
+        self.model = whisper.load_model(model_size)
 
-        print("Recording... Press Enter to stop.")
+    def record_audio(self, duration=None, samplerate=16000):
+        Transcriptor.Completion = False
+        print("Recording... Press Enter to stop manually or wait for duration.")
+
         recording = []
-        is_recording = True
 
         def callback(indata, frames, time, status):
             if status:
                 print(status)
             recording.append(indata.copy())
 
-        # recording
         stream = sd.InputStream(channels=1, samplerate=samplerate, callback=callback)
         stream.start()
 
-        input()
+        if duration:
+            sd.sleep(int(duration * 1000))
+        else:
+            input("Press Enter to stop recording...\n")
+
         stream.stop()
         stream.close()
 
-        audio_np = np.concatenate(recording, axis=0)
-
-        write(filename, samplerate, (audio_np * 32767).astype(np.int16))
-
+        audio_np = np.concatenate(recording, axis=0).flatten()
         Transcriptor.Completion = True
+        return audio_np
 
-        print(f"Recording saved to {filename}")
-        
-    def transcribe(self):
-        Transcriptor.Completion = False
-        return self.model.transcribe(self.audiopath)["text"]
-    
-
+    def transcribe_audio_array(self, audio_array, samplerate=16000):
+        print("Transcribing")
+        result = self.model.transcribe(audio_array, fp16=False, language="en", task="transcribe")
+        return result["text"]

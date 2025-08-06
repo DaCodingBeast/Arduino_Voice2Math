@@ -1,10 +1,10 @@
-# 📢 Voice to Math – AI Mathematical Solver  
+# Voice to Math – AI Mathematical Solver  
 **Created using Python and C++ | 2024–2025**
 
-## 🎯 Project Goal  
+## Project Goal  
 Speak a math problem into your computer’s microphone and have the solution wirelessly displayed on an Arduino-powered LCD.
 
-## 🛠️ How It Works  
+## How It Works  
 1. **Voice Input**  
    - The computer listens for a spoken math problem using its microphone.
 
@@ -20,7 +20,7 @@ Speak a math problem into your computer’s microphone and have the solution wir
 5. **Result Display**  
    - The Arduino receives the solution and displays it on a connected **LCD screen** (Liquid Crystal Display).
 
-## 🔌 Technologies Used  
+## Technologies Used  
 - Python  
 - C++ (Arduino IDE)  
 - OpenAI Whisper (ASR)  
@@ -28,10 +28,10 @@ Speak a math problem into your computer’s microphone and have the solution wir
 - Arduino with Wi-Fi (ESP8266/ESP32 recommended)  
 - LCD Module (16x2 or similar)
 
-## 🔐 Networking Insights  
+## Networking Insights  
 While building this system, special care was taken to navigate and understand the networking constraints imposed by school firewalls and network security protocols.
 
-## 📚 What I Learned  
+## What I Learned  
 - End-to-end pipeline for audio-based AI applications  
 - RESTful communication between Python and Arduino  
 - Real-time audio transcription and symbolic math solving  
